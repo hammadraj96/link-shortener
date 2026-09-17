@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { SupabaseConfigStatus } from '@/types';
+import { Database } from '@/types/database';
 
 // Retrieve environment variables (supporting both PUBLISHABLE_KEY and ANON_KEY)
 const rawUrl = import.meta.env.VITE_SUPABASE_URL || '';
@@ -47,10 +48,10 @@ export function getSupabaseConfigStatus(): SupabaseConfigStatus {
 }
 
 /**
- * Initialize centralized Supabase Client.
+ * Initialize centralized Supabase Client with full TypeScript Database definitions.
  * If credentials are missing in development, a safe fallback client is initialized.
  */
-function initializeSupabaseClient(): SupabaseClient {
+function initializeSupabaseClient(): SupabaseClient<Database> {
   const status = getSupabaseConfigStatus();
 
   if (!status.isConfigured) {
@@ -60,7 +61,7 @@ function initializeSupabaseClient(): SupabaseClient {
       );
     }
     // Fallback placeholder client to prevent unhandled runtime exceptions during UI preview
-    return createClient(
+    return createClient<Database>(
       supabaseUrl || 'https://placeholder.supabase.co',
       supabaseKey || 'placeholder-publishable-key',
       {
@@ -72,7 +73,7 @@ function initializeSupabaseClient(): SupabaseClient {
     );
   }
 
-  return createClient(supabaseUrl, supabaseKey, {
+  return createClient<Database>(supabaseUrl, supabaseKey, {
     auth: {
       persistSession: true,
       autoRefreshToken: true,

@@ -1,3 +1,5 @@
+export * from './database';
+
 export interface UserProfile {
   id: string;
   email: string;
