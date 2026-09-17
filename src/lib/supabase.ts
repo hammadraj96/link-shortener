@@ -1,41 +1,54 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { SupabaseConfigStatus } from '@/types';
 
-// Retrieve environment variables
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+// Retrieve environment variables (supporting both PUBLISHABLE_KEY and ANON_KEY)
+const rawUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseKey =
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  '';
 
-const isConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+// Normalize URL (if given project ref ID without http/https, prefix standard supabase domain)
+const formatSupabaseUrl = (url: string): string => {
+  const trimmed = url.trim();
+  if (!trimmed) return '';
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
+  }
+  return `https://${trimmed}.supabase.co`;
+};
+
+const supabaseUrl = formatSupabaseUrl(rawUrl);
+const isConfigured = Boolean(supabaseUrl && supabaseKey);
 
 /**
  * Diagnostic helper to safely check Supabase configuration state
  * without exposing secret keys.
  */
 export function getSupabaseConfigStatus(): SupabaseConfigStatus {
-  const urlPresent = Boolean(supabaseUrl && supabaseUrl.startsWith('http'));
-  const anonKeyPresent = Boolean(supabaseAnonKey && supabaseAnonKey.length > 10);
+  const urlPresent = Boolean(supabaseUrl && supabaseUrl.startsWith('https://'));
+  const keyPresent = Boolean(supabaseKey && supabaseKey.length > 5);
 
   let message = 'Supabase client ready';
-  if (!urlPresent && !anonKeyPresent) {
-    message = 'Missing VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env';
+  if (!urlPresent && !keyPresent) {
+    message = 'Missing VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in .env.local';
   } else if (!urlPresent) {
     message = 'Missing or invalid VITE_SUPABASE_URL';
-  } else if (!anonKeyPresent) {
-    message = 'Missing VITE_SUPABASE_ANON_KEY';
+  } else if (!keyPresent) {
+    message = 'Missing VITE_SUPABASE_PUBLISHABLE_KEY';
   }
 
   return {
-    isConfigured: urlPresent && anonKeyPresent,
+    isConfigured: urlPresent && keyPresent,
     urlPresent,
-    anonKeyPresent,
+    anonKeyPresent: keyPresent,
     message,
   };
 }
 
 /**
  * Initialize centralized Supabase Client.
- * If credentials are missing in development, a dummy placeholder client is returned
- * with non-crashing fallbacks and console diagnostics to keep the app operational.
+ * If credentials are missing in development, a safe fallback client is initialized.
  */
 function initializeSupabaseClient(): SupabaseClient {
   const status = getSupabaseConfigStatus();
@@ -43,13 +56,13 @@ function initializeSupabaseClient(): SupabaseClient {
   if (!status.isConfigured) {
     if (import.meta.env.DEV) {
       console.warn(
-        `[Supabase Dev Warning]: ${status.message}. Please configure .env with valid credentials for authentication and database features.`
+        `[Supabase Dev Warning]: ${status.message}. Please configure .env.local with valid credentials.`
       );
     }
-    // Safe initialization with dummy values to prevent runtime crashes during initial UI setup
+    // Fallback placeholder client to prevent unhandled runtime exceptions during UI preview
     return createClient(
       supabaseUrl || 'https://placeholder.supabase.co',
-      supabaseAnonKey || 'placeholder-anon-key',
+      supabaseKey || 'placeholder-publishable-key',
       {
         auth: {
           persistSession: false,
@@ -59,7 +72,7 @@ function initializeSupabaseClient(): SupabaseClient {
     );
   }
 
-  return createClient(supabaseUrl, supabaseAnonKey, {
+  return createClient(supabaseUrl, supabaseKey, {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
