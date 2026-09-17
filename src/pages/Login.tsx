@@ -1,50 +1,59 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Link2, ArrowLeft, ShieldCheck, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link2, ArrowLeft, ShieldCheck, AlertCircle, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/useToast';
 import { getSupabaseConfigStatus } from '@/lib/supabase';
 
 export const Login: React.FC = () => {
-  const { signInWithGoogle } = useAuth();
-  const { success, warning } = useToast();
+  const { user, signInWithGoogle, isConfigured } = useAuth();
+  const { warning } = useToast();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
+  const location = useLocation();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const supabaseStatus = getSupabaseConfigStatus();
+
+  // If already logged in, redirect directly to dashboard or original target
+  useEffect(() => {
+    if (user) {
+      const from = (location.state as { from?: { pathname?: string } })?.from?.pathname || '/dashboard';
+      navigate(from, { replace: true });
+    }
+  }, [user, navigate, location]);
 
   const handleGoogleLogin = async () => {
     setIsSubmitting(true);
+    setAuthError(null);
+
     if (!supabaseStatus.isConfigured) {
-      warning('Supabase Not Configured', 'In Phase 1, continuing in demo mode to dashboard.');
+      warning('Supabase Not Configured', 'Continuing in preview mode to dashboard.');
       setTimeout(() => {
         setIsSubmitting(false);
         navigate('/dashboard');
-      }, 600);
+      }, 500);
       return;
     }
 
     const { error } = await signInWithGoogle();
     setIsSubmitting(false);
+
     if (error) {
-      warning('Authentication Notice', error.message);
+      console.warn('[Google Auth Error]:', error.message);
+      // Friendly message if Google provider is not yet enabled in Supabase dashboard
+      if (
+        error.message.toLowerCase().includes('provider is not enabled') ||
+        error.message.toLowerCase().includes('unsupported provider')
+      ) {
+        setAuthError(
+          'Google OAuth is not yet enabled in your Supabase project. Please enable Google in Supabase Dashboard > Authentication > Providers.'
+        );
+      } else {
+        setAuthError(error.message);
+      }
     }
-  };
-
-  const handleEmailSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) return;
-
-    if (!supabaseStatus.isConfigured) {
-      success('Demo Session Started', 'Entering dashboard preview mode.');
-      navigate('/dashboard');
-      return;
-    }
-
-    success('Magic Link Requested', 'Check your inbox for the login link.');
   };
 
   return (
@@ -69,7 +78,7 @@ export const Login: React.FC = () => {
             Welcome to Snip<span className="text-brand-600">Link</span>
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Sign in to access your shortened URLs and real-time analytics
+            Sign in with your Google account to access your links and dashboard
           </p>
         </div>
 
@@ -78,20 +87,31 @@ export const Login: React.FC = () => {
           <CardHeader className="text-center pb-2">
             <CardTitle>Sign in to your account</CardTitle>
             <CardDescription>
-              Choose your preferred sign-in method to continue
+              Fast and secure single sign-on with Google
             </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4 pt-4">
-            {/* Supabase Status Alert in Dev */}
-            {!supabaseStatus.isConfigured && (
+            {/* Supabase Status Alert in Dev if unconfigured */}
+            {!isConfigured && (
               <div className="rounded-lg bg-amber-50 p-3 border border-amber-200 flex items-start gap-2.5">
                 <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                 <div className="text-[11px] text-amber-800">
-                  <p className="font-semibold">Phase 1 Preview Mode</p>
+                  <p className="font-semibold">Local Preview Mode</p>
                   <p className="text-amber-700 mt-0.5">
-                    Supabase credentials are not yet configured in <code className="font-mono bg-amber-100 px-1 py-0.2 rounded">.env</code>. You can click below to explore the dashboard UI.
+                    Supabase credentials are not configured in <code className="font-mono bg-amber-100 px-1 py-0.2 rounded">.env.local</code>.
                   </p>
+                </div>
+              </div>
+            )}
+
+            {/* Auth Error Display */}
+            {authError && (
+              <div className="rounded-lg bg-rose-50 p-3.5 border border-rose-200 flex items-start gap-2.5 animate-in fade-in-50">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <div className="text-xs text-rose-800">
+                  <p className="font-semibold">Authentication Notice</p>
+                  <p className="text-rose-700 mt-1 leading-relaxed">{authError}</p>
                 </div>
               </div>
             )}
@@ -100,7 +120,7 @@ export const Login: React.FC = () => {
             <Button
               variant="outline"
               size="lg"
-              className="w-full border-slate-300 hover:bg-slate-50 gap-2.5 font-medium text-slate-700"
+              className="w-full border-slate-300 hover:bg-slate-50 gap-2.5 font-medium text-slate-700 shadow-xs"
               onClick={handleGoogleLogin}
               isLoading={isSubmitting}
             >
@@ -124,29 +144,6 @@ export const Login: React.FC = () => {
               </svg>
               Continue with Google
             </Button>
-
-            {/* Divider */}
-            <div className="relative my-4 flex items-center justify-center">
-              <div className="w-full border-t border-slate-200" />
-              <span className="bg-white px-2.5 text-[11px] font-medium uppercase text-slate-400 absolute">
-                Or with email
-              </span>
-            </div>
-
-            {/* Email form preview */}
-            <form onSubmit={handleEmailSubmit} className="space-y-3">
-              <Input
-                type="email"
-                label="Email Address"
-                placeholder="name@company.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-              <Button type="submit" className="w-full">
-                Continue with Email
-              </Button>
-            </form>
 
             {/* Terms note */}
             <p className="text-[11px] text-center text-slate-400 mt-4 leading-relaxed">

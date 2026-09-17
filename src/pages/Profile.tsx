@@ -1,15 +1,50 @@
-import React from 'react';
-import { Mail, Calendar, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Mail, Calendar, CheckCircle2, Save, User } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/useToast';
+import { formatDate } from '@/lib/utils';
 
 export const Profile: React.FC = () => {
-  const { user } = useAuth();
+  const { user, profile, updateProfile } = useAuth();
+  const { success, error: toastError } = useToast();
 
-  const userEmail = user?.email || 'demo.user@linkshortener.app';
-  const userName = user?.user_metadata?.full_name || 'Demo Creator';
+  const [fullName, setFullName] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (profile?.full_name) {
+      setFullName(profile.full_name);
+    } else if (user?.user_metadata?.full_name || user?.user_metadata?.name) {
+      setFullName(user.user_metadata.full_name || user.user_metadata.name);
+    }
+  }, [profile, user]);
+
+  const userEmail = profile?.email || user?.email || 'user@example.com';
+  const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url || user?.user_metadata?.picture;
+  const displayName = fullName || profile?.full_name || user?.user_metadata?.full_name || 'Anonymous User';
+  const createdAt = profile?.created_at || user?.created_at || new Date().toISOString();
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+
+    const { error } = await updateProfile({
+      full_name: fullName.trim(),
+    });
+
+    setIsSaving(false);
+
+    if (error) {
+      toastError('Update Failed', error.message);
+    } else {
+      success('Profile Updated', 'Your display name has been saved successfully.');
+    }
+  };
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -27,12 +62,12 @@ export const Profile: React.FC = () => {
       <Card className="border-slate-200 shadow-sm">
         <CardHeader className="border-b border-slate-100 pb-5">
           <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-            <Avatar name={userName} size="xl" />
+            <Avatar name={displayName} src={avatarUrl} size="xl" />
             <div className="space-y-1">
               <div className="flex items-center gap-2.5">
-                <CardTitle className="text-lg">{userName}</CardTitle>
+                <CardTitle className="text-lg">{displayName}</CardTitle>
                 <Badge variant="success" size="sm">
-                  Active
+                  Active User
                 </Badge>
               </div>
               <CardDescription className="flex items-center gap-1.5">
@@ -48,10 +83,10 @@ export const Profile: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-1">
               <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
-                Account ID
+                Account / User ID
               </span>
-              <p className="text-xs font-mono font-medium text-slate-800 truncate">
-                {user?.id || 'usr_preview_mode_2026'}
+              <p className="text-xs font-mono font-medium text-slate-800 truncate select-all">
+                {user?.id || 'usr_preview_mode'}
               </p>
             </div>
 
@@ -61,13 +96,48 @@ export const Profile: React.FC = () => {
               </span>
               <p className="text-xs font-medium text-slate-800 flex items-center gap-1.5">
                 <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                September 2026
+                {formatDate(createdAt)}
               </p>
             </div>
           </div>
 
+          {/* Edit Profile Form */}
+          <form onSubmit={handleSaveProfile} className="space-y-4 pt-2">
+            <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+              <User className="w-4 h-4 text-brand-600" />
+              <span>Personal Information</span>
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Input
+                label="Full Display Name"
+                placeholder="e.g. Alex Morgan"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                disabled={isSaving}
+              />
+              <Input
+                label="Email Address"
+                value={userEmail}
+                disabled
+                helperText="Email is managed via your Google authentication account"
+              />
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <Button
+                type="submit"
+                size="sm"
+                isLoading={isSaving}
+                leftIcon={!isSaving && <Save className="w-4 h-4" />}
+              >
+                Save Changes
+              </Button>
+            </div>
+          </form>
+
           {/* Connected Authentication Providers */}
-          <div className="space-y-3 pt-2">
+          <div className="space-y-3 pt-2 border-t border-slate-100">
             <h3 className="text-sm font-semibold text-slate-900">
               Connected Providers
             </h3>
@@ -100,7 +170,7 @@ export const Profile: React.FC = () => {
               </div>
               <Badge variant="success" size="sm">
                 <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                <span>Ready</span>
+                <span>Connected</span>
               </Badge>
             </div>
           </div>

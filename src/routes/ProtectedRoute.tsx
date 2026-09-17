@@ -9,8 +9,8 @@ interface ProtectedRouteProps {
 
 /**
  * ProtectedRoute Component
- * In Phase 1, allows viewing the dashboard layout while preparing the session
- * verification architecture for Phase 2 (Supabase Auth).
+ * Restricts access to authenticated users when Supabase is configured.
+ * Redirects unauthenticated visitors to /login.
  */
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { user, isLoading, isConfigured } = useAuth();
@@ -28,9 +28,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     );
   }
 
-  // If Supabase is fully configured and there's no active user session, redirect to /login
-  // In Phase 1 dev mode without credentials, we let the user preview the dashboard UI
-  if (isConfigured && !user && false) {
+  // If Supabase is configured and there is no active user session, redirect to /login
+  if (isConfigured && !user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 

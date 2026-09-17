@@ -14,7 +14,7 @@ interface TopNavProps {
 }
 
 export const TopNav: React.FC<TopNavProps> = ({ title = 'Dashboard', onOpenMobileMenu }) => {
-  const { user, signOut } = useAuth();
+  const { user, profile, signOut } = useAuth();
   const { info } = useToast();
   const navigate = useNavigate();
   const supabaseStatus = getSupabaseConfigStatus();
@@ -24,6 +24,10 @@ export const TopNav: React.FC<TopNavProps> = ({ title = 'Dashboard', onOpenMobil
     info('Signed out', 'You have been logged out.');
     navigate('/login');
   };
+
+  const displayName = profile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.name || 'User Account';
+  const displayEmail = profile?.email || user?.email || 'user@example.com';
+  const displayAvatar = profile?.avatar_url || user?.user_metadata?.avatar_url || user?.user_metadata?.picture;
 
   const userMenuItems = [
     {
@@ -83,16 +87,16 @@ export const TopNav: React.FC<TopNavProps> = ({ title = 'Dashboard', onOpenMobil
           trigger={
             <div className="flex items-center gap-2.5 rounded-full p-1 hover:bg-slate-100 transition-colors">
               <Avatar
-                name={user?.email || 'Demo User'}
-                src={user?.user_metadata?.avatar_url}
+                name={displayName}
+                src={displayAvatar}
                 size="sm"
               />
               <div className="hidden text-left lg:block pr-1.5">
                 <p className="text-xs font-semibold text-slate-800 leading-tight">
-                  {user?.user_metadata?.full_name || 'Demo User'}
+                  {displayName}
                 </p>
-                <p className="text-[11px] text-slate-400 leading-tight">
-                  {user?.email || 'demo@linkshortener.app'}
+                <p className="text-[11px] text-slate-400 leading-tight truncate max-w-[150px]">
+                  {displayEmail}
                 </p>
               </div>
             </div>
